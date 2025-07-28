@@ -3,7 +3,7 @@
 
 🌟 Overview
 -----------
-Video Downloader is a slick Python-based GUI app that lets you grab videos and audio from platforms like YouTube, Vimeo, TikTok, Instagram, Twitter/X, Reddit, SoundCloud, Dailymotion, and Facebook! 🎬 It uses yt-dlp and ffmpeg to power downloads and supports multiple formats (MP4 at 2160p, 1080p, 720p, or MP3). 🖱️
+Video Downloader is a slick Python-based GUI app that lets you grab videos and audio from platforms like YouTube, Vimeo, TikTok, Instagram, Twitter/X, Reddit, SoundCloud, Dailymotion, and Others! 🎬 It uses yt-dlp and ffmpeg to power downloads and supports multiple formats (MP4 at 2160p, 1080p, 720p, or MP3). 🖱️
 
 🔥 Features
 -----------
@@ -100,8 +100,7 @@ Video Downloader is a slick Python-based GUI app that lets you grab videos and a
 - 📰 Reddit (reddit.com)
 - 🎧 SoundCloud (soundcloud.com)
 - 📺 Dailymotion (dailymotion.com)
-- 📘 Facebook (facebook.com)
-- 🌐 Other platforms supported by yt-dlp (check compatibility)
+- 🌐 Other platforms supported by yt-dlp (check compatibility but running 'list_of_downloading_website.bat')
 
 📝 Notes
 --------
