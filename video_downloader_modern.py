@@ -1,10 +1,41 @@
-import itertools, threading, queue, sys, shutil, os, subprocess, tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+import itertools, threading, queue, sys, shutil, os, subprocess, json
 from urllib.parse import urlparse
-import json
 from collections import deque
 
-# ---------------------- Dependency Check ----------------------
+from PyQt6.QtWidgets import (
+    QApplication, QWidget, QLabel, QPushButton,
+    QVBoxLayout, QTextEdit, QScrollArea, QComboBox, QHBoxLayout, QMessageBox, QFrame, QFileDialog
+)
+from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QTimer
+
+DARK_BLUE = "#004080"
+SUPPORTED_SITES = {
+    "YouTube": ["youtube.com", "youtu.be"], "Vimeo": ["vimeo.com"],
+    "TikTok": ["tiktok.com"], "Instagram": ["instagram.com"],
+    "Twitter/X": ["twitter.com", "x.com"], "Reddit": ["reddit.com"],
+    "SoundCloud": ["soundcloud.com"], "Dailymotion": ["dailymotion.com"],
+    "Facebook": ["facebook.com"], "Other": []
+}
+
+button_style = f"""
+    QPushButton {{
+        background-color: {DARK_BLUE};
+        color: white;
+        font-weight: bold;
+        padding: 10px;
+        border-radius: 8px;
+    }}
+    QPushButton:hover {{
+        background-color: white;
+        color: {DARK_BLUE};
+        font-weight: bold;
+        padding: 10px;
+        border: 2px solid {DARK_BLUE};
+        border-radius: 8px;
+    }}
+"""
+
 def ensure_dependencies():
     if not shutil.which("yt-dlp"):
         try:
@@ -24,179 +55,26 @@ def ensure_dependencies():
                 show_dep_error("ffmpeg")
 
 def show_dep_error(pkg):
-    root = tk.Tk(); root.withdraw()
-    messagebox.showerror("❌ Dependency Error", f"🚫 {pkg} could not be installed.\nPlease install it manually.")
-    root.destroy(); sys.exit(1)
-
-ensure_dependencies()
-
-# ---------------------- Modern UI Setup ----------------------
-SECONDARY_COLOR = "#ffffff"
-ACCENT_COLOR = "#142e51"
-LIGHT_COLOR = "#e6f1fa"
-DARK_COLOR = "#0f1c32"
-BG_GRADIENT = "#e3ecfa"
-FONT = ("Segoe UI", 11)
-HEADER_FONT = ("Segoe UI Semibold", 13)
-LABEL_FONT = ("Segoe UI", 10)
-
-def set_gradient(widget, width, height, color1, color2):
-    """Set vertical gradient background (Canvas hack)."""
-    canvas = tk.Canvas(widget, width=width, height=height, highlightthickness=0)
-    for i in range(height):
-        ratio = i / height
-        r1, g1, b1 = widget.winfo_rgb(color1)
-        r2, g2, b2 = widget.winfo_rgb(color2)
-        r = int(r1 + ratio * (r2 - r1)) // 256
-        g = int(g1 + ratio * (g2 - g1)) // 256
-        b = int(b1 + ratio * (b2 - b1)) // 256
-        color = f"#{r:02x}{g:02x}{b:02x}"
-        canvas.create_line(0, i, width, i, fill=color)
-    canvas.place(x=0, y=0)
-    return canvas
-
-# ---------------------- Scrollable Root Setup ----------------------
-def make_scrollable_root(root, width=950, height=650):
-    # Create a canvas and a vertical scrollbar for scrolling
-    canvas = tk.Canvas(root, borderwidth=0, background=BG_GRADIENT, width=width, height=height)
-    v_scroll = tk.Scrollbar(root, orient="vertical", command=canvas.yview)
-    canvas.configure(yscrollcommand=v_scroll.set)
-
-    canvas.pack(side="left", fill="both", expand=True)
-    v_scroll.pack(side="right", fill="y")
-
-    # Frame inside the canvas for widgets
-    scroll_frame = tk.Frame(canvas, background=BG_GRADIENT)
-    scroll_frame_id = canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
-
-    # Function to update scrollregion
-    def on_frame_configure(event):
-        canvas.configure(scrollregion=canvas.bbox("all"))
-    scroll_frame.bind("<Configure>", on_frame_configure)
-
-    # Mousewheel scrolling
-    def _on_mousewheel(event):
-        canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-    canvas.bind_all("<MouseWheel>", _on_mousewheel)
-
-    # Resize the inner frame when the window size changes
-    def on_canvas_configure(event):
-        canvas.itemconfig(scroll_frame_id, width=event.width)
-    canvas.bind("<Configure>", on_canvas_configure)
-
-    return scroll_frame, canvas
-
-root = tk.Tk()
-root.withdraw()
-download_folder = filedialog.askdirectory(title="📁 Select download folder")
-if not download_folder:
-    messagebox.showwarning("⚠️ Cancelled", "No folder selected. Exiting.")
-    sys.exit()
-
-root.deiconify()
-root.title("🎬 Video Downloader")
-root.geometry("950x650")
-root.configure(bg=BG_GRADIENT)
-root.protocol("WM_DELETE_WINDOW", root.quit)
-
-# Make scrollable root
-scroll_frame, canvas = make_scrollable_root(root)
-
-# Use modern themed style
-style = ttk.Style()
-style.theme_use("clam")
-style.configure("TButton",
-    padding=7,
-    relief="flat",
-    background=DARK_COLOR,
-    foreground=SECONDARY_COLOR,
-    font=FONT,
-    borderwidth=2,
-    borderradius=5,
-)
-
-style.map("TButton",
-    background=[("active", SECONDARY_COLOR), ("disabled", "#b7c5dc")],
-    foreground=[("active", DARK_COLOR), ("disabled", "#a0a0a0")],
-    relief=[("active", "solid"), ("!pressed", "flat")],
-    bordercolor=[("active", DARK_COLOR), ("!active", DARK_COLOR)],
-    borderwidth=[("active", 2), ("!active", 2)],
-    borderradius=[("active", 5), ("!active", 5)]
-)
-style.configure("TLabel", background=BG_GRADIENT, foreground=ACCENT_COLOR, font=LABEL_FONT)
-style.configure("TCombobox",
-    padding=6,
-    selectbackground=DARK_COLOR,
-    selectforeground=SECONDARY_COLOR,
-    fieldbackground=SECONDARY_COLOR,
-    background=DARK_COLOR,
-    font=FONT
-)
-style.configure("TLabelframe", background=BG_GRADIENT, foreground=DARK_COLOR)
-style.configure("TLabelframe.Label", font=HEADER_FONT, background=BG_GRADIENT, foreground=ACCENT_COLOR)
-
-SUPPORTED_SITES = {
-    "YouTube": ["youtube.com", "youtu.be"], "Vimeo": ["vimeo.com"],
-    "TikTok": ["tiktok.com"], "Instagram": ["instagram.com"],
-    "Twitter/X": ["twitter.com", "x.com"], "Reddit": ["reddit.com"],
-    "SoundCloud": ["soundcloud.com"], "Dailymotion": ["dailymotion.com"],
-    "Facebook": ["facebook.com"], "Other": []
-}
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(sys.argv)
+    msg = QMessageBox()
+    msg.setIcon(QMessageBox.Icon.Critical)
+    msg.setWindowTitle("❌ Dependency Error")
+    msg.setText(f"🚫 {pkg} could not be installed.\nPlease install it manually.")
+    msg.exec()
+    sys.exit(1)
 
 def detect_platform(url):
-    hostname = urlparse(url).hostname or ""
-    hostname = hostname.replace("www.", "")
-    for platform, domains in SUPPORTED_SITES.items():
-        if any(domain in hostname for domain in domains):
-            return platform
-    return "Other"
-
-# ---------------------- UI Layout ----------------------
-def add_shadow(widget, color="#b5d0f7"):
-    widget.update_idletasks()
-    x, y, w, h = widget.winfo_x(), widget.winfo_y(), widget.winfo_width(), widget.winfo_height()
-    shadow = tk.Frame(widget.master, bg=color, width=w, height=6)
-    shadow.place(x=x, y=y+h)
-    return shadow
-
-def create_header(parent):
-    header_frame = tk.Frame(parent, bg=DARK_COLOR, height=64)
-    header_frame.pack(fill="x")
-    logo = tk.Label(header_frame, text="🎬", font=("Segoe UI Emoji", 26), bg=DARK_COLOR, fg=SECONDARY_COLOR)
-    logo.pack(side="left", padx=16, pady=10)
-    title = tk.Label(header_frame, text="Video Downloader", font=("Segoe UI Semibold", 18), bg=DARK_COLOR, fg=SECONDARY_COLOR)
-    title.pack(side="left", padx=(0, 20), pady=10)
-    return header_frame
-
-create_header(scroll_frame)
-
-url_frame = ttk.Labelframe(scroll_frame, text="📋 Paste video URLs (one per line)", padding=(16, 12))
-url_frame.pack(padx=18, pady=12, fill="x")
-textbox = tk.Text(url_frame, width=100, height=7, font=FONT, highlightbackground=DARK_COLOR, relief="flat", bg=LIGHT_COLOR, fg=ACCENT_COLOR, insertbackground=DARK_COLOR)
-textbox.pack(padx=6, pady=6, fill="x")
-
-btn_frame = tk.Frame(scroll_frame, bg=BG_GRADIENT)
-btn_frame.pack(padx=10, pady=4)
-ttk.Button(btn_frame, text="➕ Set Format Options", command=lambda: prepare_links(custom=True)).pack(side="left", padx=10)
-ttk.Button(btn_frame, text="🚀 Start Download", command=lambda: start_download()).pack(side="left", padx=4)
-ttk.Button(btn_frame, text="🔄 Reset", command=lambda: reset_ui()).pack(side="left", padx=10)
-
-tk.Label(scroll_frame, text="🔁 Max Concurrent Downloads:", font=LABEL_FONT, bg=BG_GRADIENT, fg=ACCENT_COLOR).pack()
-thread_count_var = tk.IntVar(value=2)
-thread_count_menu = ttk.Combobox(scroll_frame, values=[1, 2, 3, 4, 5], state="readonly", textvariable=thread_count_var, width=5)
-thread_count_menu.pack(pady=2)
-
-preview_frame = ttk.Labelframe(scroll_frame, text="📄 Video Info & Format Selection", padding=(16, 12))
-preview_frame.pack(padx=18, pady=12, fill="both")
-entry_widgets = []
-metadata_cache = {}
-fetch_cancel_flag = False
-
-progress_frame = ttk.Labelframe(scroll_frame, text="📥 Download Progress", padding=(16, 12))
-progress_frame.pack(padx=18, pady=12, fill="both", expand=True)
-progress_labels = []
-queue_out = queue.Queue()
-completed, failed = [], []
+    try:
+        hostname = urlparse(url).hostname or ""
+        hostname = hostname.replace("www.", "")
+        for platform, domains in SUPPORTED_SITES.items():
+            if any(domain in hostname for domain in domains):
+                return platform
+        return "Other"
+    except Exception:
+        return "Other"
 
 def format_duration(seconds):
     try:
@@ -206,42 +84,277 @@ def format_duration(seconds):
     except:
         return "--:--"
 
-def cancel_metadata(spinner_label, cancel_btn):
-    global fetch_cancel_flag
-    fetch_cancel_flag = True
-    spinner_label.config(text="❌ Metadata fetch cancelled.", fg="#d42a2a")
-    cancel_btn.destroy()
+class ThreadPool:
+    def __init__(self, max_threads):
+        self.max = max_threads
+        self.q = deque()
+        self.active = 0
 
-def prepare_links(custom=False):
-    global fetch_cancel_flag
-    for widget in preview_frame.winfo_children():
-        widget.destroy()
-    entry_widgets.clear()
-    fetch_cancel_flag = False
+    def add(self, job):
+        self.q.append(job)
+        self.try_start()
 
-    links = textbox.get("1.0", tk.END).strip().splitlines()
-    if not links:
-        messagebox.showwarning("⚠️ No Input", "Paste at least one URL.")
-        return
+    def try_start(self):
+        while self.active < self.max and self.q:
+            self.active += 1
+            threading.Thread(target=self.worker, args=(self.q.popleft(),)).start()
 
-    spinner_label = tk.Label(preview_frame, text="⏳ Fetching metadata...", font=LABEL_FONT, bg=BG_GRADIENT, fg=DARK_COLOR)
-    spinner_label.pack(anchor="w", pady=3)
-    cancel_btn = ttk.Button(preview_frame, text="❌ Cancel", command=lambda: cancel_metadata(spinner_label, cancel_btn))
-    cancel_btn.pack(anchor="e", pady=2)
-
-    def fetch(url, idx):
-        if fetch_cancel_flag: return
+    def worker(self, job):
         try:
-            if url in metadata_cache:
-                meta = metadata_cache[url]
+            job()
+        finally:
+            self.active -= 1
+            self.try_start()
+
+class MainWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Video Downloader")
+        self.setGeometry(250, 100, 1000, 700)
+        self.setFixedSize(1000, 700)
+        self.download_folder = ""
+        self.metadata_cache = {}
+        self.entry_widgets = []
+        self.progress_labels = []
+        self.completed = []
+        self.failed = []
+        self.queue_out = queue.Queue()
+        self.pool = None
+        self.metadata_queue = queue.Queue()
+        self.metadata_threads = []
+        self.metadata_cancel_flag = False
+        self.metadata_links = []
+        self.metadata_links_count = 0
+        self.metadata_custom = False
+        self.metadata_loading_widgets = []
+        self.metadata_loading_cancel_btn = None
+        self.init_ui()
+
+    def init_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Scroll Area Setup
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        content_widget = QWidget()
+        scroll_area.setWidget(content_widget)
+        scroll_layout = QVBoxLayout(content_widget)
+        scroll_layout.setContentsMargins(20, 20, 20, 20)
+        scroll_layout.setSpacing(10)
+
+        # Header
+        header = QLabel("🚀 Video Downloader!")
+        header.setFixedSize(950, 100)
+        header.setFont(QFont("Play", 20))
+        header.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
+        header.setStyleSheet(f"background-color: {DARK_BLUE}; color: white; padding: 10px; font-weight: bold;")
+
+        # Download folder label & button
+        self.download_label = QLabel("No folder selected")
+        self.download_label.setStyleSheet("color: gray; font-style: italic;")
+        self.download_label.setFont(QFont("Play", 12))
+        button_select_folder = QPushButton("📁 Select Download Folder")
+        button_select_folder.setStyleSheet(button_style)
+        button_select_folder.setFont(QFont("Play", 14))
+        button_select_folder.setFixedHeight(50)
+        button_select_folder.setFixedWidth(300)
+        button_select_folder.clicked.connect(self.select_folder)
+
+        # Description label
+        label = QLabel("Paste one/multiple URLs per line!")
+        label.setFont(QFont("Play", 16))
+        label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        label.setStyleSheet(f"color: {DARK_BLUE}; padding: 10px; font-weight: bold;")
+        label.setFixedHeight(50)
+
+        # TextEdit for URLs
+        self.url_input = QTextEdit()
+        self.url_input.setPlaceholderText("Paste URLs here, one per line...")
+        self.url_input.setFont(QFont("Play", 12))
+        self.url_input.setFixedHeight(200)
+
+        # Format option button
+        self.button_setFormat = QPushButton("🎯 Set Format Option")
+        self.button_setFormat.setStyleSheet(button_style)
+        self.button_setFormat.setFont(QFont("Play", 14))
+        self.button_setFormat.setFixedHeight(50)
+        self.button_setFormat.setFixedWidth(250)
+        self.button_setFormat.clicked.connect(lambda: self.prepare_links(custom=True))
+
+        # Start download button
+        self.button_startDownload = QPushButton("📥 Start Download")
+        self.button_startDownload.setStyleSheet(button_style)
+        self.button_startDownload.setFont(QFont("Play", 14))
+        self.button_startDownload.setFixedHeight(50)
+        self.button_startDownload.setFixedWidth(250)
+        self.button_startDownload.clicked.connect(self.start_download)
+
+        # Reset button
+        self.button_reset = QPushButton("🔄 Reset")
+        self.button_reset.setStyleSheet(button_style)
+        self.button_reset.setFont(QFont("Play", 14))
+        self.button_reset.setFixedHeight(50)
+        self.button_reset.setFixedWidth(250)
+        self.button_reset.clicked.connect(self.reset_ui)
+
+        label_concurrent = QLabel("Max Concurrent Downloads:")
+        label_concurrent.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        label_concurrent.setFont(QFont("Play", 16))
+        label_concurrent.setStyleSheet(f"color: {DARK_BLUE}; padding: 10px; font-weight: bold;")
+        label_concurrent.setFixedHeight(50)
+
+        self.combo = QComboBox()
+        self.combo.addItems([str(i) for i in range(1, 6)])
+        self.combo.setCurrentIndex(2)
+        self.combo.setFixedWidth(50)
+        self.combo.setFont(QFont("Play", 14))
+
+        combo_layout = QHBoxLayout()
+        combo_layout.addWidget(label_concurrent)
+        combo_layout.addWidget(self.combo)
+        combo_layout.addStretch()
+
+        self.result_label = QLabel("")
+        self.result_label.setFont(QFont("Play", 14))
+        self.result_label.setStyleSheet("color: green; font-weight: bold;")
+
+        self.video_info_label = QLabel("✨ Video Info & Format Selection")
+        self.video_info_label.setFont(QFont("Play", 14))
+        self.video_info_label.setStyleSheet(f"color: {DARK_BLUE}; font-weight: bold;")
+
+        # Preview & Progress Frames
+        self.preview_frame = QFrame()
+        self.preview_layout = QVBoxLayout(self.preview_frame)
+        self.preview_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        self.preview_frame.setMinimumHeight(120)
+
+        self.download_progress_label = QLabel("📥 Download Progress")
+        self.download_progress_label.setFont(QFont("Play", 14))
+        self.download_progress_label.setStyleSheet(f"color: {DARK_BLUE}; font-weight: bold;")
+
+        self.progress_frame = QFrame()
+        self.progress_layout = QVBoxLayout(self.progress_frame)
+        self.progress_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        self.progress_frame.setMinimumHeight(120)
+
+        # Add widgets in order
+        scroll_layout.addWidget(header)
+        scroll_layout.addWidget(button_select_folder, alignment=Qt.AlignmentFlag.AlignCenter)
+        scroll_layout.addWidget(self.download_label, alignment=Qt.AlignmentFlag.AlignCenter)
+        scroll_layout.addWidget(label)
+        scroll_layout.addWidget(self.url_input)
+        scroll_layout.addWidget(self.button_setFormat, alignment=Qt.AlignmentFlag.AlignCenter)
+        scroll_layout.addWidget(self.button_startDownload, alignment=Qt.AlignmentFlag.AlignCenter)
+        scroll_layout.addWidget(self.button_reset, alignment=Qt.AlignmentFlag.AlignCenter)
+        scroll_layout.addLayout(combo_layout)
+        scroll_layout.addWidget(self.result_label)
+        scroll_layout.addWidget(self.video_info_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        scroll_layout.addWidget(self.preview_frame)
+        scroll_layout.addWidget(self.download_progress_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        scroll_layout.addWidget(self.progress_frame)
+        scroll_layout.addStretch(1)
+        main_layout.addWidget(scroll_area)
+
+    def select_folder(self):
+        folder = QFileDialog.getExistingDirectory(self, "Select Download Folder", os.path.expanduser("~"))
+        if folder:
+            self.download_folder = folder
+            self.download_label.setText(folder)
+        else:
+            self.download_label.setText("No folder selected")
+            self.download_folder = ""
+
+    def prepare_links(self, custom=False):
+        # Clear preview frame
+        for i in reversed(range(self.preview_layout.count())):
+            widget = self.preview_layout.itemAt(i).widget()
+            if widget: widget.deleteLater()
+        self.entry_widgets.clear()
+        self.metadata_cancel_flag = False
+        self.metadata_links = [l.strip() for l in self.url_input.toPlainText().strip().splitlines() if l.strip()]
+        self.metadata_links_count = len(self.metadata_links)
+        self.metadata_custom = custom
+        if not self.metadata_links:
+            self.show_warning("⚠️ No Input", "Paste at least one URL.")
+            return
+
+        # Add loading spinner and cancel button
+        spinner_label = QLabel("⏳ Fetching metadata...")
+        spinner_label.setFont(QFont("Play", 14))
+        self.preview_layout.addWidget(spinner_label)
+        self.metadata_loading_widgets = [spinner_label]
+        cancel_btn = QPushButton("❌ Cancel")
+        cancel_btn.setStyleSheet(button_style)
+        cancel_btn.clicked.connect(self.cancel_metadata_loading)
+        self.preview_layout.addWidget(cancel_btn, alignment=Qt.AlignmentFlag.AlignRight)
+        self.metadata_loading_cancel_btn = cancel_btn
+
+        # Start threads for metadata fetching
+        for idx, url in enumerate(self.metadata_links):
+            t = threading.Thread(target=self.metadata_fetch_worker, args=(url, idx, custom), daemon=True)
+            t.start()
+            self.metadata_threads.append(t)
+
+        # Start polling the queue for results
+        QTimer.singleShot(100, self.metadata_poll_queue)
+
+    def cancel_metadata_loading(self):
+        self.metadata_cancel_flag = True
+        # Disable cancel button and show cancelled
+        if self.metadata_loading_widgets:
+            self.metadata_loading_widgets[0].setText("❌ Metadata fetch cancelled.")
+        if self.metadata_loading_cancel_btn:
+            self.metadata_loading_cancel_btn.setDisabled(True)
+
+    def metadata_fetch_worker(self, url, idx, custom):
+        if self.metadata_cancel_flag:
+            return
+        try:
+            if url in self.metadata_cache:
+                meta = self.metadata_cache[url]
             else:
-                res = subprocess.run(["yt-dlp", "--dump-json", "--skip-download", url],
-                                     capture_output=True, text=True, timeout=30, check=True)
+                res = subprocess.run(
+                    ["yt-dlp", "--dump-json", "--skip-download", url],
+                    capture_output=True, text=True, timeout=30, check=True)
                 meta = json.loads(res.stdout)
-                metadata_cache[url] = meta
-        except:
+                self.metadata_cache[url] = meta
+        except Exception:
             meta = {"error": True}
-        if fetch_cancel_flag: return
+        # Push result to the queue
+        if not self.metadata_cancel_flag:
+            self.metadata_queue.put((url, idx, meta, custom))
+
+    def metadata_poll_queue(self):
+        while True:
+            try:
+                url, idx, meta, custom = self.metadata_queue.get_nowait()
+                self.metadata_display_result(url, idx, meta, custom)
+            except queue.Empty:
+                break
+        # If all results are in or cancelled, update spinner label and cancel btn
+        if (len(self.entry_widgets) == self.metadata_links_count or self.metadata_cancel_flag):
+            if self.metadata_loading_widgets:
+                if self.metadata_cancel_flag:
+                    self.metadata_loading_widgets[0].setText("❌ Metadata fetch cancelled.")
+                else:
+                    self.metadata_loading_widgets[0].setText("✅ Metadata loaded.")
+            if self.metadata_loading_cancel_btn:
+                self.metadata_loading_cancel_btn.setDisabled(True)
+        else:
+            # Keep polling until done
+            QTimer.singleShot(100, self.metadata_poll_queue)
+
+    def metadata_display_result(self, url, idx, meta, custom):
+        # Remove spinner/cancel from preview area (once)
+        if self.metadata_loading_widgets:
+            for w in self.metadata_loading_widgets:
+                w.deleteLater()
+            self.metadata_loading_widgets = []
+            if self.metadata_loading_cancel_btn:
+                self.metadata_loading_cancel_btn.deleteLater()
+                self.metadata_loading_cancel_btn = None
 
         if "error" in meta:
             text = "❌ Failed to fetch info"
@@ -257,177 +370,129 @@ def prepare_links(custom=False):
             size_str = f"{round(int(size)/1024/1024, 1)} MB" if size else "~"
             text = f"🎞 {title} ({size_str}, {duration})"
 
-        row = tk.Frame(preview_frame, bg=LIGHT_COLOR)
-        row.pack(fill="x", padx=2, pady=3)
-        lbl = tk.Label(row, text=text[:80] + ("..." if len(text) > 80 else ""), anchor="w", width=80, font=LABEL_FONT, bg=LIGHT_COLOR, fg=ACCENT_COLOR)
-        lbl.pack(side="left", padx=6, pady=1)
-
+        row = QHBoxLayout()
+        lbl = QLabel(text if len(text) < 80 else text[:80] + "...")
+        lbl.setMinimumWidth(400)
+        lbl.setFont(QFont("Play", 14))
+        row.addWidget(lbl)
         if custom:
             format_list = ["MP4 - 2160p", "MP4 - 1080p", "MP4 - 720p", "MP3 - best"]
         else:
             format_list = ["MP4", "MP3"]
+        combo = QComboBox()
+        combo.addItems(format_list)
+        combo.setCurrentText("MP4 - 1080p" if custom else "MP4")
+        combo.setFont(QFont("Play", 12))
+        combo.setFixedWidth(150)
+        row.addWidget(combo)
+        frame = QFrame()
+        frame.setLayout(row)
+        self.preview_layout.addWidget(frame)
+        self.entry_widgets.append((url, combo, lbl))
 
-        combo = ttk.Combobox(row, values=format_list, state="readonly", width=15, font=FONT)
-        combo.set("MP4 - 1080p" if custom else "MP4")
-        combo.pack(side="right", padx=4, pady=1)
+    def reset_ui(self):
+        self.url_input.clear()
+        for i in reversed(range(self.progress_layout.count())):
+            widget = self.progress_layout.itemAt(i).widget()
+            if widget: widget.deleteLater()
+        for i in reversed(range(self.preview_layout.count())):
+            widget = self.preview_layout.itemAt(i).widget()
+            if widget: widget.deleteLater()
+        self.progress_labels.clear()
+        self.entry_widgets.clear()
+        self.metadata_cache.clear()
+        self.completed.clear()
+        self.failed.clear()
+        self.result_label.setText("")
 
-        entry_widgets.append((url, combo, lbl))
-
-        if idx == len(links) - 1:
-            spinner_label.config(text="✅ Metadata loaded.", fg="#2ad47a")
-            cancel_btn.destroy()
-
-    for idx, url in enumerate(links):
-        threading.Thread(target=fetch, args=(url.strip(), idx), daemon=True).start()
-
-def reset_ui():
-    textbox.delete("1.0", tk.END)
-    for lbl in progress_labels:
-        lbl.destroy()
-    progress_labels.clear()
-    entry_widgets.clear()
-    metadata_cache.clear()
-    completed.clear()
-    failed.clear()
-    for widget in preview_frame.winfo_children():
-        widget.destroy()
-
-def download_worker(idx, url, fmt):
-    try:
-        platform = detect_platform(url)
-        is_playlist = "playlist" in url.lower()
-        output = os.path.join(download_folder, "%(playlist_title)s" if is_playlist else "", "%(title)s.%(ext)s")
-        output = output.replace("\\", "/")
-
-        cmd = ["yt-dlp", "-o", output]
-
-        if "MP3" in fmt:
-            cmd += ["-f", "bestaudio", "--extract-audio", "--audio-format", "mp3"]
-        else:
-            cmd += ["--write-auto-subs", "--write-subs", "--sub-langs", "en", "--sub-format", "srt"]
-            if "2160p" in fmt:
-                cmd += ["-f", "bv[height<=2160]+ba/b", "--merge-output-format", "mp4", "--embed-subs"]
-            elif "1080p" in fmt:
-                cmd += ["-f", "bv[height<=1080]+ba/b", "--merge-output-format", "mp4", "--embed-subs"]
-            elif "720p" in fmt:
-                cmd += ["-f", "bv[height<=720]+ba/b", "--merge-output-format", "mp4", "--embed-subs"]
+    def download_worker(self, idx, url, fmt):
+        try:
+            platform = detect_platform(url)
+            is_playlist = "playlist" in url.lower()
+            output = os.path.join(self.download_folder or ".", "%(playlist_title)s" if is_playlist else "", "%(title)s.%(ext)s")
+            output = output.replace("\\", "/")
+            cmd = ["yt-dlp", "-o", output]
+            if "MP3" in fmt:
+                cmd += ["-f", "bestaudio", "--extract-audio", "--audio-format", "mp3"]
             else:
-                cmd += ["-f", "bv[height<=1080]+ba/b", "--merge-output-format", "mp4", "--embed-subs"]
+                cmd += ["--write-auto-subs", "--write-subs", "--sub-langs", "en", "--sub-format", "srt"]
+                if "2160p" in fmt:
+                    cmd += ["-f", "bv[height<=2160]+ba/b", "--merge-output-format", "mp4", "--embed-subs"]
+                elif "1080p" in fmt:
+                    cmd += ["-f", "bv[height<=1080]+ba/b", "--merge-output-format", "mp4", "--embed-subs"]
+                elif "720p" in fmt:
+                    cmd += ["-f", "bv[height<=720]+ba/b", "--merge-output-format", "mp4", "--embed-subs"]
+                else:
+                    cmd += ["-f", "bv[height<=1080]+ba/b", "--merge-output-format", "mp4", "--embed-subs"]
 
-        queue_out.put(("status", idx, url, f"⬇️ Downloading from {platform}..."))
-        proc = subprocess.Popen(cmd + [url], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        for line in proc.stdout:
-            queue_out.put(("progress", idx, url, line.strip()))
-        if proc.wait() == 0:
-            queue_out.put(("success", idx, url, "✔️ Done"))
+            self.queue_out.put(("status", idx, url, f'<span style="color: {DARK_BLUE}; font-size: 16px; font-family: Play; font-weight: bold;">⬇️ Downloading from {platform}...</span>'))
+            proc = subprocess.Popen(cmd + [url], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            for line in proc.stdout:
+                styled_line = f'<span style="color: {DARK_BLUE}; font-size: 16px; font-family: Play;">{line.strip()}</span>'
+                self.queue_out.put(("progress", idx, url, styled_line))
+            if proc.wait() == 0:
+                self.queue_out.put(("success", idx, url, '<span style="color: green; font-size: 16px; font-family: Play; font-weight: bold;">✔️ Done</span>'))
+            else:
+                self.queue_out.put(("fail", idx, url, '<span style="color: red; font-size: 16px; font-family: Play; font-weight: bold;">❌ Download error</span>'))
+        except Exception as e:
+            self.queue_out.put(("fail", idx, url, f"❌ {str(e)}"))
+
+    def process_queue(self):
+        try:
+            while True:
+                msg_type, idx, url, msg = self.queue_out.get_nowait()
+                if idx is not None and idx < len(self.progress_labels):
+                    display = msg[:150] + ('...' if len(msg) > 150 else '')
+                    self.progress_labels[idx].setText(display)
+        except queue.Empty:
+            pass
+        QTimer.singleShot(300, self.process_queue)
+
+    def start_download(self):
+        if not self.download_folder:
+            self.select_folder()
+            if not self.download_folder:
+                self.show_warning("⚠️ Cancelled", "No folder selected.")
+                return
+
+        urls = [l.strip() for l in self.url_input.toPlainText().strip().splitlines() if l.strip()]
+        if not urls:
+            self.show_warning("⚠️ Empty", "Paste at least one URL.")
+            return
+
+        # Clear progress frame
+        for i in reversed(range(self.progress_layout.count())):
+            widget = self.progress_layout.itemAt(i).widget()
+            if widget: widget.deleteLater()
+        self.progress_labels.clear()
+
+        # If formats not set (no preview), use default
+        if not self.entry_widgets or all(fmt_box is None for _, fmt_box, _ in self.entry_widgets):
+            self.pool = ThreadPool(int(self.combo.currentText()))
+            for idx, url in enumerate(urls):
+                label = QLabel(f"🔄 Waiting: {url[:60]}")
+                self.progress_layout.addWidget(label)
+                self.progress_labels.append(label)
+                self.pool.add(lambda i=idx, u=url: self.download_worker(i, u, "MP4 - 1080p"))
         else:
-            queue_out.put(("fail", idx, url, "❌ Download error"))
-    except Exception as e:
-        queue_out.put(("fail", idx, url, f"❌ {str(e)}"))
+            # Use selection from preview
+            self.pool = ThreadPool(int(self.combo.currentText()))
+            for idx, (url, fmt_box, _) in enumerate(self.entry_widgets):
+                fmt = fmt_box.currentText() if fmt_box else "MP4 - 1080p"
+                label = QLabel(f"🔄 Waiting: {url[:60]}")
+                self.progress_layout.addWidget(label)
+                self.progress_labels.append(label)
+                self.pool.add(lambda i=idx, u=url, f=fmt: self.download_worker(i, u, f))
 
-def process_queue():
-    try:
-        while True:
-            msg_type, idx, url, msg = queue_out.get_nowait()
-            if idx is not None and idx < len(progress_labels):
-                color = "#2ad47a" if "Done" in msg or "success" in msg_type else ("#d42a2a" if "❌" in msg else ACCENT_COLOR)
-                progress_labels[idx].config(text=f"{msg}", fg=color)
-            if msg_type == "success":
-                completed.append(url)
-            elif msg_type == "fail":
-                failed.append(url)
-    except queue.Empty:
-        pass
-    root.after(300, process_queue)
+        self.result_label.setText("🚀 Download started...")
+        QTimer.singleShot(300, self.process_queue)
 
-def start_download():
-    urls = textbox.get("1.0", tk.END).strip().splitlines()
-    if not urls:
-        messagebox.showwarning("⚠️ Empty", "Paste at least one URL.")
-        return
+    def show_warning(self, title, msg):
+        QMessageBox.warning(self, title, msg)
 
-    # Check if format options are set; if not, use default format with ThreadPool
-    if not entry_widgets or all(fmt_box is None for _, fmt_box, _ in entry_widgets):
-        for lbl in progress_labels:
-            lbl.destroy()
-        progress_labels.clear()
-
-        for idx, url in enumerate(urls):
-            lbl = tk.Label(progress_frame, text=f"🔄 Waiting: {url[:60]}", anchor="w", font=LABEL_FONT, bg=LIGHT_COLOR, fg=ACCENT_COLOR)
-            lbl.pack(fill="x", padx=2, pady=2)
-            progress_labels.append(lbl)
-
-        class ThreadPool:
-            def __init__(self, max_threads):
-                self.max = max_threads
-                self.q = deque()
-                self.active = 0
-
-            def add(self, job):
-                self.q.append(job)
-                self.try_start()
-
-            def try_start(self):
-                while self.active < self.max and self.q:
-                    self.active += 1
-                    threading.Thread(target=self.worker, args=(self.q.popleft(),)).start()
-
-            def worker(self, job):
-                try:
-                    job()
-                finally:
-                    self.active -= 1
-                    self.try_start()
-
-        pool = ThreadPool(thread_count_var.get())
-        for idx, url in enumerate(urls):
-            pool.add(lambda i=idx, u=url: download_worker(i, u, "MP4 - 1080p"))
-        root.after(300, process_queue)
-    else:
-        root.after(1000, continue_download, urls)
-
-def continue_download(urls):
-    for lbl in progress_labels:
-        lbl.destroy()
-    progress_labels.clear()
-
-    if len(entry_widgets) != len(urls):
-        entry_widgets.clear()
-        for url in urls:
-            entry_widgets.append((url, None, None))
-
-    for idx, (url, fmt_box, _) in enumerate(entry_widgets):
-        lbl = tk.Label(progress_frame, text=f"🔄 Waiting: {url[:60]}", anchor="w", font=LABEL_FONT, bg=LIGHT_COLOR, fg=ACCENT_COLOR)
-        lbl.pack(fill="x", padx=2, pady=2)
-        progress_labels.append(lbl)
-
-    class ThreadPool:
-        def __init__(self, max_threads):
-            self.max = max_threads
-            self.q = deque()
-            self.active = 0
-
-        def add(self, job):
-            self.q.append(job)
-            self.try_start()
-
-        def try_start(self):
-            while self.active < self.max and self.q:
-                self.active += 1
-                threading.Thread(target=self.worker, args=(self.q.popleft(),)).start()
-
-        def worker(self, job):
-            try:
-                job()
-            finally:
-                self.active -= 1
-                self.try_start()
-
-    pool = ThreadPool(thread_count_var.get())
-    for idx, (url, fmt_box, _) in enumerate(entry_widgets):
-        fmt = fmt_box.get() if fmt_box else "MP4 - 1080p"
-        pool.add(lambda i=idx, u=url, f=fmt: download_worker(i, u, f))
-
-    root.after(300, process_queue)
-
-root.mainloop()
+if __name__ == "__main__":
+    ensure_dependencies()
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())
