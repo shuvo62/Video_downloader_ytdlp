@@ -10,6 +10,7 @@ from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt, QTimer
 
 DARK_BLUE = "#004080"
+ORANGE = "#FF5F15"
 SUPPORTED_SITES = {
     "YouTube": ["youtube.com", "youtu.be"], "Vimeo": ["vimeo.com"],
     "TikTok": ["tiktok.com"], "Instagram": ["instagram.com"],
@@ -428,10 +429,10 @@ class MainWindow(QWidget):
             self.queue_out.put(("status", idx, url, f'<span style="color: {DARK_BLUE}; font-size: 16px; font-family: Play; font-weight: bold;">⬇️ Downloading from {platform}...</span>'))
             proc = subprocess.Popen(cmd + [url], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             for line in proc.stdout:
-                styled_line = f'<span style="color: {DARK_BLUE}; font-size: 16px; font-family: Play;">{line.strip()}</span>'
+                styled_line = f'<span style="color: {ORANGE}; font-size: 16px; font-family: Play; font-weight: bold;">⏳ {line.strip()}</span>'
                 self.queue_out.put(("progress", idx, url, styled_line))
             if proc.wait() == 0:
-                self.queue_out.put(("success", idx, url, '<span style="color: green; font-size: 16px; font-family: Play; font-weight: bold;">✔️ Done</span>'))
+                self.queue_out.put(("success", idx, url, '<span style="color: green; font-size: 16px; font-family: Play; font-weight: bold;">✅ Done</span>'))
             else:
                 self.queue_out.put(("fail", idx, url, '<span style="color: red; font-size: 16px; font-family: Play; font-weight: bold;">❌ Download error</span>'))
         except Exception as e:
