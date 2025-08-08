@@ -56,7 +56,7 @@ YouTube, Vimeo, TikTok, Instagram, Twitter/X, Reddit, SoundCloud, Dailymotion, a
 
 - On first run, the app will attempt to auto-install `yt-dlp` and `ffmpeg` using `pip` or `winget`.
 - If auto-install fails, you may need to install these tools manually.
-- Long progress lines are word-wrapped and will never overflow the window.
+- If shows '❌download error' than close the program. Double click on 'upgrade.bat'. Run program again.
 
 ## License
 
