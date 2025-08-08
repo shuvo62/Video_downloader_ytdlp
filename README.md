@@ -15,7 +15,7 @@ Supports YouTube, Vimeo, TikTok, Instagram, Twitter/X, Reddit, SoundCloud, Daily
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.9+
 - See [`requirements.txt`](./requirements.txt) for PyQt6 and other dependencies.
 - `yt-dlp` and `ffmpeg` (auto-installed if missing).
 
@@ -32,7 +32,9 @@ Supports YouTube, Vimeo, TikTok, Instagram, Twitter/X, Reddit, SoundCloud, Daily
 3. **Run the application:**
 
    ```sh
-   python video_downloader_pyqt6.py
+   python video_downloader_modern.py
+   or,
+   Run 'run_video_downloader_modern.bat' file
    ```
 
    The app will attempt to install `yt-dlp` and `ffmpeg` automatically if not found.
