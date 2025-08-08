@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Support Me - Donate</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f0f4f8;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        color: #333;
+      }
+      .container {
+        background: white;
+        padding: 2rem 3rem;
+        border-radius: 12px;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+        max-width: 400px;
+        text-align: center;
+      }
+      h1 {
+        margin-bottom: 1rem;
+        color: #004080;
+      }
+      .method {
+        margin: 1.5rem 0;
+        padding: 1rem;
+        border: 2px solid #004080;
+        border-radius: 8px;
+        background: #e6f0ff;
+      }
+      .method h2 {
+        margin-bottom: 0.5rem;
+      }
+      .code {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #000;
+        user-select: all;
+        background: #d9e6ff;
+        padding: 0.3rem 0.6rem;
+        border-radius: 6px;
+        display: inline-block;
+        cursor: pointer;
+      }
+      .copy-text {
+        margin-top: 0.3rem;
+        font-size: 0.9rem;
+        color: #0073e6;
+        cursor: pointer;
+        user-select: none;
+      }
+      footer {
+        margin-top: 2rem;
+        font-size: 0.85rem;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Support My Work</h1>
+
+      <div class="method" id="bkash-method">
+        <h2>bKash (if you are in Bangladesh)</h2>
+        <div class="code" onclick="copyText('bkash-number')" id="bkash-number">
+          01746126351
+        </div>
+        <div class="copy-text" onclick="copyText('bkash-number')">
+          Click to copy bKash number
+        </div>
+      </div>
+
+      <div class="method" id="binance-method">
+        <h2>Binance UID</h2>
+        <div class="code" onclick="copyText('binance-uid')" id="binance-uid">
+          301111600
+        </div>
+        <div class="copy-text" onclick="copyText('binance-uid')">
+          Click to copy Binance UID
+        </div>
+      </div>
+
+      <footer>Thank you for your support! 🙏</footer>
+    </div>
+
+    <script>
+      function copyText(id) {
+        const text = document.getElementById(id).innerText;
+        navigator.clipboard
+          .writeText(text)
+          .then(() => {
+            alert(`Copied: ${text}`);
+          })
+          .catch(() => {
+            alert("Failed to copy. Please copy manually.");
+          });
+      }
+    </script>
+  </body>
+</html>
