@@ -15,7 +15,7 @@ Supports YouTube, Vimeo, TikTok, Instagram, Twitter/X, Reddit, SoundCloud, Daily
 
 ## Requirements
 
-- Python 3.9+
+- Python 3.10+ (3.12.3 is better)
 - See [`requirements.txt`](./requirements.txt) for PyQt6 and other dependencies.
 - `yt-dlp` and `ffmpeg` (auto-installed if missing).
 
