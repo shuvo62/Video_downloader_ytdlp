@@ -233,20 +233,29 @@ class MainWindow(QWidget):
         self.video_info_label.setFont(QFont("Play", 14))
         self.video_info_label.setStyleSheet(f"color: {DARK_BLUE}; font-weight: bold;")
 
-        # Preview & Progress Frames
-        self.preview_frame = QFrame()
-        self.preview_layout = QVBoxLayout(self.preview_frame)
-        self.preview_frame.setFrameShape(QFrame.Shape.StyledPanel)
-        self.preview_frame.setMinimumHeight(120)
+        # Preview Area (for video info and format selection)
+        self.preview_scroll = QScrollArea()
+        self.preview_scroll.setWidgetResizable(True)
+        self.preview_scroll.setFixedHeight(160)  # adjust as needed
+        self.preview_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.preview_widget = QWidget()
+        self.preview_layout = QVBoxLayout(self.preview_widget)
+        self.preview_layout.setContentsMargins(0, 0, 0, 0)
+        self.preview_scroll.setWidget(self.preview_widget)
 
         self.download_progress_label = QLabel("📥 Download Progress")
         self.download_progress_label.setFont(QFont("Play", 14))
         self.download_progress_label.setStyleSheet(f"color: {DARK_BLUE}; font-weight: bold;")
 
-        self.progress_frame = QFrame()
-        self.progress_layout = QVBoxLayout(self.progress_frame)
-        self.progress_frame.setFrameShape(QFrame.Shape.StyledPanel)
-        self.progress_frame.setMinimumHeight(120)
+        # Progress Area (for download progress)
+        self.progress_scroll = QScrollArea()
+        self.progress_scroll.setWidgetResizable(True)
+        self.progress_scroll.setFixedHeight(160)  # adjust as needed
+        self.progress_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.progress_widget = QWidget()
+        self.progress_layout = QVBoxLayout(self.progress_widget)
+        self.progress_layout.setContentsMargins(0, 0, 0, 0)
+        self.progress_scroll.setWidget(self.progress_widget)
 
         # Add widgets in order
         scroll_layout.addWidget(header)
@@ -260,9 +269,9 @@ class MainWindow(QWidget):
         scroll_layout.addLayout(combo_layout)
         scroll_layout.addWidget(self.result_label)
         scroll_layout.addWidget(self.video_info_label, alignment=Qt.AlignmentFlag.AlignLeft)
-        scroll_layout.addWidget(self.preview_frame)
+        scroll_layout.addWidget(self.preview_scroll)
         scroll_layout.addWidget(self.download_progress_label, alignment=Qt.AlignmentFlag.AlignLeft)
-        scroll_layout.addWidget(self.progress_frame)
+        scroll_layout.addWidget(self.progress_scroll)
         scroll_layout.addStretch(1)
         main_layout.addWidget(scroll_area)
 
