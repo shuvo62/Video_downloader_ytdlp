@@ -12,6 +12,7 @@ from PyQt6.QtCore import Qt, QTimer
 DARK_BLUE = "#004080"
 ORANGE = "#FF5F15"
 LIGHT_GRAY = "#F0F0F0"
+CONFIG_FILE = os.path.expanduser("~/.video_downloader_config.json")
 
 SUPPORTED_SITES = {
     "YouTube": ["youtube.com", "youtu.be"], "Vimeo": ["vimeo.com"],
@@ -87,6 +88,21 @@ def format_duration(seconds):
     except:
         return "--:--"
 
+def save_last_folder(folder_path):
+    try:
+        with open(CONFIG_FILE, "w") as f:
+            json.dump({"last_folder": folder_path}, f)
+    except Exception:
+        pass
+
+def load_last_folder():
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            data = json.load(f)
+            return data.get("last_folder", "")
+    except Exception:
+        return ""
+
 class ThreadPool:
     def __init__(self, max_threads):
         self.max = max_threads
@@ -113,6 +129,8 @@ class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Video Downloader")
+        self.download_folder = load_last_folder()
+        self.metadata_cache = {}
         self.setGeometry(250, 100, 1000, 700)
         self.setFixedSize(1000, 700)
         self.setStyleSheet(f"""
@@ -121,7 +139,7 @@ class MainWindow(QWidget):
                 color: black;
             }}
         """)
-        self.download_folder = ""
+        self.download_folder = load_last_folder()
         self.metadata_cache = {}
         self.entry_widgets = []
         self.progress_labels = []
@@ -160,6 +178,7 @@ class MainWindow(QWidget):
         header.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
         header.setStyleSheet(f"background-color: {DARK_BLUE}; color: white; padding: 10px; font-weight: bold;")
 
+            
         # Download folder label & button
         self.download_label = QLabel("No folder selected")
         self.download_label.setStyleSheet("color: gray; font-style: italic;")
@@ -170,6 +189,10 @@ class MainWindow(QWidget):
         button_select_folder.setFixedHeight(50)
         button_select_folder.setFixedWidth(300)
         button_select_folder.clicked.connect(self.select_folder)
+        if self.download_folder:
+            self.download_label.setText(self.download_folder)
+        else:
+            self.download_label.setText("No folder selected")
 
         # Description label
         label = QLabel("Paste one/multiple URLs per line!")
@@ -280,6 +303,7 @@ class MainWindow(QWidget):
         if folder:
             self.download_folder = folder
             self.download_label.setText(folder)
+            save_last_folder(folder)
         else:
             self.download_label.setText("No folder selected")
             self.download_folder = ""
