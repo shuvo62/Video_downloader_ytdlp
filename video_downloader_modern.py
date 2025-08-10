@@ -277,7 +277,7 @@ class MainWindow(QWidget):
         self.progress_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.progress_widget = QWidget()
         self.progress_layout = QVBoxLayout(self.progress_widget)
-        self.progress_layout.setContentsMargins(0, 0, 0, 0)
+        self.progress_layout.setContentsMargins(0, 20, 0, 20)
         self.progress_scroll.setWidget(self.progress_widget)
 
         # Add widgets in order
@@ -512,7 +512,8 @@ class MainWindow(QWidget):
         if not self.entry_widgets or all(fmt_box is None for _, fmt_box, _ in self.entry_widgets):
             self.pool = ThreadPool(int(self.combo.currentText()))
             for idx, url in enumerate(urls):
-                label = QLabel(f"🔄 Waiting: {url[:60]}")
+                label = QLabel(f'<span style="font-size:14px; font-weight: bold; font-family: Play;">🔄 Waiting:</span> '
+                   f'<span style="font-size:14px; font-weight: bold; font-family: Play;">{url[:60]}</span>')
                 self.progress_layout.addWidget(label)
                 self.progress_labels.append(label)
                 self.pool.add(lambda i=idx, u=url: self.download_worker(i, u, "MP4 - 1080p"))
@@ -521,7 +522,8 @@ class MainWindow(QWidget):
             self.pool = ThreadPool(int(self.combo.currentText()))
             for idx, (url, fmt_box, _) in enumerate(self.entry_widgets):
                 fmt = fmt_box.currentText() if fmt_box else "MP4 - 1080p"
-                label = QLabel(f"🔄 Waiting: {url[:60]}")
+                label = QLabel(f'<span style="font-size:14px; font-weight: bold; font-family: Play;">🔄 Waiting:</span> '
+                   f'<span style="font-size:14px; font-weight: bold; font-family: Play;">{url[:60]}</span>')
                 self.progress_layout.addWidget(label)
                 self.progress_labels.append(label)
                 self.pool.add(lambda i=idx, u=url, f=fmt: self.download_worker(i, u, f))
