@@ -1,4 +1,4 @@
-import itertools, threading, queue, sys, shutil, os, subprocess, json
+import threading, queue, sys, shutil, os, subprocess, json
 from urllib.parse import urlparse
 from collections import deque
 
