@@ -11,6 +11,8 @@ from PyQt6.QtCore import Qt, QTimer
 
 DARK_BLUE = "#004080"
 ORANGE = "#FF5F15"
+LIGHT_GRAY = "#F0F0F0"
+
 SUPPORTED_SITES = {
     "YouTube": ["youtube.com", "youtu.be"], "Vimeo": ["vimeo.com"],
     "TikTok": ["tiktok.com"], "Instagram": ["instagram.com"],
@@ -113,6 +115,12 @@ class MainWindow(QWidget):
         self.setWindowTitle("Video Downloader")
         self.setGeometry(250, 100, 1000, 700)
         self.setFixedSize(1000, 700)
+        self.setStyleSheet(f"""
+            QWidget {{
+                background-color: {LIGHT_GRAY};
+                color: black;
+            }}
+        """)
         self.download_folder = ""
         self.metadata_cache = {}
         self.entry_widgets = []
