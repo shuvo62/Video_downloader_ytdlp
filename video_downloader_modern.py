@@ -227,7 +227,6 @@ class MainWindow(QWidget):
         header.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
         header.setStyleSheet(f"background-color: {DARK_BLUE}; color: white; padding: 10px; font-weight: bold;")
 
-            
         # Download folder label & button
         self.download_label = QLabel("No folder selected")
         self.download_label.setStyleSheet("color: gray; font-style: italic;")
@@ -280,7 +279,7 @@ class MainWindow(QWidget):
         self.button_reset.setFixedWidth(250)
         self.button_reset.clicked.connect(self.reset_ui)
 
-        label_concurrent = QLabel("🚀 Max Concurrent Downloads:")
+        label_concurrent = QLabel("⚡ Max Concurrent Downloads:")
         label_concurrent.setAlignment(Qt.AlignmentFlag.AlignLeft)
         label_concurrent.setFont(QFont("Play", 16))
         label_concurrent.setStyleSheet(f"color: {DARK_BLUE}; padding: 10px; font-weight: bold;")
@@ -374,6 +373,7 @@ class MainWindow(QWidget):
         # Add loading spinner and cancel button
         spinner_label = QLabel("⏳ Fetching metadata...")
         spinner_label.setFont(QFont("Play", 14))
+        spinner_label.setStyleSheet(f"color: {ORANGE}; font-weight: bold;")
         self.preview_layout.addWidget(spinner_label)
         self.metadata_loading_widgets = [spinner_label]
         cancel_btn = QPushButton("❌ Cancel")
@@ -449,6 +449,7 @@ class MainWindow(QWidget):
 
         if "error" in meta:
             text = "❌ Failed to fetch info"
+            title = "Unknown"
         elif meta.get("_type") == "playlist":
             title = meta.get("title", "Playlist")
             count = len(meta.get("entries", []))
@@ -479,7 +480,7 @@ class MainWindow(QWidget):
         frame = QFrame()
         frame.setLayout(row)
         self.preview_layout.addWidget(frame)
-        self.entry_widgets.append((url, combo, lbl))
+        self.entry_widgets.append((url, combo, lbl, title))  # <- now holds url, combo, lbl, title
 
     def reset_ui(self):
         self.url_input.clear()
@@ -496,7 +497,7 @@ class MainWindow(QWidget):
         self.failed.clear()
         self.result_label.setText("")
 
-    def download_worker(self, idx, url, fmt):
+    def download_worker(self, idx, url, fmt, title):
         try:
             platform = detect_platform(url)
             is_playlist = "playlist" in url.lower()
@@ -522,11 +523,11 @@ class MainWindow(QWidget):
                 styled_line = f'<span style="color: {ORANGE}; font-size: 16px; font-family: Play; font-weight: bold;">⏳ {line.strip()}</span>'
                 self.queue_out.put(("progress", idx, url, styled_line))
             if proc.wait() == 0:
-                self.queue_out.put(("success", idx, url, '<span style="color: green; font-size: 16px; font-family: Play; font-weight: bold;">✅ Done</span>'))
+                self.queue_out.put(("success", idx, url, f'<span style="color: green; font-size: 16px; font-family: Play; font-weight: bold;">✅ Done: {title}</span>'))
             else:
-                self.queue_out.put(("fail", idx, url, '<span style="color: red; font-size: 16px; font-family: Play; font-weight: bold;">❌ Download error</span>'))
+                self.queue_out.put(("fail", idx, url, f'<span style="color: red; font-size: 16px; font-family: Play; font-weight: bold;">❌ Download error: {title}</span>'))
         except Exception as e:
-            self.queue_out.put(("fail", idx, url, f"❌ {str(e)}"))
+            self.queue_out.put(("fail", idx, url, f"❌ {str(e)}: {title}"))
 
     def process_queue(self):
         try:
@@ -537,7 +538,16 @@ class MainWindow(QWidget):
                     self.progress_labels[idx].setText(display)
         except queue.Empty:
             pass
-        QTimer.singleShot(300, self.process_queue)
+
+        all_done = all(
+            ('Done:' in label.text() or 'Download error' in label.text() or '❌' in label.text())
+            for label in self.progress_labels
+        )
+        if all_done and self.progress_labels:
+            self.result_label.setText("✅ Download Finished")
+            self.result_label.setStyleSheet("color: green; font-weight: bold;")
+        else:
+            QTimer.singleShot(300, self.process_queue)
 
     def start_download(self):
         if not self.download_folder:
@@ -551,33 +561,75 @@ class MainWindow(QWidget):
             self.show_warning("⚠️ Empty", "Paste at least one URL.")
             return
 
+        # Find URLs that need metadata
+        urls_to_fetch = [url for url in urls if url not in self.metadata_cache]
+
+        if urls_to_fetch:
+            self.result_label.setText("⏳ Fetching metadata...")
+            self.result_label.setFont(QFont("Play", 14))
+            self.result_label.setStyleSheet(f"color: {ORANGE}; font-weight: bold;")
+            self.fetching_count = len(urls_to_fetch)
+            self.fetching_done = 0
+            self.metadata_fetch_queue = queue.Queue()
+            for url in urls_to_fetch:
+                threading.Thread(target=self._fetch_metadata_bg, args=(url,), daemon=True).start()
+            self._poll_metadata_fetch_queue(urls, urls_to_fetch)
+        else:
+            self._proceed_to_download(urls)
+
+    def _fetch_metadata_bg(self, url):
+        try:
+            res = subprocess.run(
+                ["yt-dlp", "--dump-json", "--skip-download", url],
+                capture_output=True, text=True, timeout=30, check=True)
+            meta = json.loads(res.stdout)
+        except Exception:
+            meta = {}
+        self.metadata_fetch_queue.put((url, meta))
+
+    def _poll_metadata_fetch_queue(self, all_urls, urls_to_fetch):
+        while not self.metadata_fetch_queue.empty():
+            url, meta = self.metadata_fetch_queue.get()
+            self.metadata_cache[url] = meta
+            self.fetching_done += 1
+
+        if self.fetching_done < self.fetching_count:
+            QTimer.singleShot(100, lambda: self._poll_metadata_fetch_queue(all_urls, urls_to_fetch))
+        else:
+            self.result_label.setText("✅ Metadata loaded. Starting downloads...")
+            self._proceed_to_download(all_urls)
+
+    def _proceed_to_download(self, urls):
         # Clear progress frame
         for i in reversed(range(self.progress_layout.count())):
             widget = self.progress_layout.itemAt(i).widget()
             if widget: widget.deleteLater()
         self.progress_labels.clear()
 
-        # If formats not set (no preview), use default
-        if not self.entry_widgets or all(fmt_box is None for _, fmt_box, _ in self.entry_widgets):
+        # If formats not set (no preview), use default and fetch title from metadata_cache
+        if not self.entry_widgets or all(fmt_box is None for _, fmt_box, *_ in self.entry_widgets):
             self.pool = ThreadPool(int(self.combo.currentText()))
             for idx, url in enumerate(urls):
+                meta = self.metadata_cache.get(url, {})
+                title = meta.get("title", "Unknown")
                 label = QLabel(f'<span style="font-size:14px; font-weight: bold; font-family: Play;">🔄 Waiting:</span> '
                    f'<span style="font-size:14px; font-weight: bold; font-family: Play;">{url[:60]}</span>')
                 self.progress_layout.addWidget(label)
                 self.progress_labels.append(label)
-                self.pool.add(lambda i=idx, u=url: self.download_worker(i, u, "MP4 - 1080p"))
+                self.pool.add(lambda i=idx, u=url, t=title: self.download_worker(i, u, "MP4 - 1080p", t))
         else:
             # Use selection from preview
             self.pool = ThreadPool(int(self.combo.currentText()))
-            for idx, (url, fmt_box, _) in enumerate(self.entry_widgets):
+            for idx, (url, fmt_box, _, title) in enumerate(self.entry_widgets):
                 fmt = fmt_box.currentText() if fmt_box else "MP4 - 1080p"
                 label = QLabel(f'<span style="font-size:14px; font-weight: bold; font-family: Play;">🔄 Waiting:</span> '
                    f'<span style="font-size:14px; font-weight: bold; font-family: Play;">{url[:60]}</span>')
                 self.progress_layout.addWidget(label)
                 self.progress_labels.append(label)
-                self.pool.add(lambda i=idx, u=url, f=fmt: self.download_worker(i, u, f))
+                self.pool.add(lambda i=idx, u=url, f=fmt, t=title: self.download_worker(i, u, f, t))
 
         self.result_label.setText("🚀 Download started...")
+        self.result_label.setStyleSheet("color: green; font-weight: bold;")
         QTimer.singleShot(300, self.process_queue)
 
     def show_warning(self, title, msg):
