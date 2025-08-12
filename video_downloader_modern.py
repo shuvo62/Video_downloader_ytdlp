@@ -10,9 +10,58 @@ from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt, QTimer
 
 DARK_BLUE = "#004080"
+LIGHT_BLUE = "#0069D2"
 ORANGE = "#FF5F15"
 LIGHT_GRAY = "#F0F0F0"
 CONFIG_FILE = os.path.expanduser("~/.video_downloader_config.json")
+
+modern_scrollbar_style = f"""
+QScrollBar:vertical {{
+    border: none;
+    background: {LIGHT_GRAY};
+    width: 14px;
+    margin: 0px 0px 0px 0px;
+    border-radius: 7px;
+}}
+QScrollBar::handle:vertical {{
+    background: {DARK_BLUE};
+    min-height: 40px;
+    border-radius: 7px;
+}}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+    height: 0px;
+    background: none;
+}}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+    background: none;
+}}
+
+QScrollBar:horizontal {{
+    border: none;
+    background: {LIGHT_GRAY};
+    height: 14px;
+    margin: 0px 0px 0px 0px;
+    border-radius: 7px;
+}}
+QScrollBar::handle:horizontal {{
+    background: {DARK_BLUE};
+    min-width: 40px;
+    border-radius: 7px;
+}}
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+    width: 0px;
+    background: none;
+}}
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+    background: none;
+}}
+QScrollBar::handle:vertical:hover {{
+  background: {LIGHT_BLUE};
+}}
+QScrollBar::handle:horizontal:hover {{
+  background: {LIGHT_BLUE};
+}}
+"""
 
 SUPPORTED_SITES = {
     "YouTube": ["youtube.com", "youtu.be"], "Vimeo": ["vimeo.com"],
@@ -231,7 +280,7 @@ class MainWindow(QWidget):
         self.button_reset.setFixedWidth(250)
         self.button_reset.clicked.connect(self.reset_ui)
 
-        label_concurrent = QLabel("Max Concurrent Downloads:")
+        label_concurrent = QLabel("🚀 Max Concurrent Downloads:")
         label_concurrent.setAlignment(Qt.AlignmentFlag.AlignLeft)
         label_concurrent.setFont(QFont("Play", 16))
         label_concurrent.setStyleSheet(f"color: {DARK_BLUE}; padding: 10px; font-weight: bold;")
@@ -239,7 +288,7 @@ class MainWindow(QWidget):
 
         self.combo = QComboBox()
         self.combo.addItems([str(i) for i in range(1, 6)])
-        self.combo.setCurrentIndex(2)
+        self.combo.setCurrentIndex(2) # Default to 3 concurrent downloads.
         self.combo.setFixedWidth(50)
         self.combo.setFont(QFont("Play", 14))
 
@@ -537,6 +586,7 @@ class MainWindow(QWidget):
 if __name__ == "__main__":
     ensure_dependencies()
     app = QApplication(sys.argv)
+    app.setStyleSheet(modern_scrollbar_style)
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
