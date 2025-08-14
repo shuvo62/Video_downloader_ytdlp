@@ -1,2 +1,2 @@
-@echo "🚀 Starting Video Downloader Script...🚀"
+@echo "Starting Video Downloader Script..."
 python video_downloader_modern.py

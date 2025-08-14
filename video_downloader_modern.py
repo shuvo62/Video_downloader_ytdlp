@@ -243,7 +243,7 @@ class MainWindow(QWidget):
             self.download_label.setText("No folder selected")
 
         # Description label
-        label = QLabel("Paste one/multiple URLs per line!")
+        label = QLabel("📋 Paste one or multiple URLs/playlists per line!")
         label.setFont(QFont("Play", 16))
         label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         label.setStyleSheet(f"color: {DARK_BLUE}; padding: 10px; font-weight: bold;")

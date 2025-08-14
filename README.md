@@ -7,7 +7,7 @@ Supports YouTube, Vimeo, TikTok, Instagram, Twitter/X, Reddit, SoundCloud, Daily
 
 - **Paste multiple URLs:** Download many videos at once.
 - **Metadata preview:** See info and select download format before downloading.
-- **Format selection:** Choose resolution and file type (MP4/MP3).
+- **Format selection:** Choose resolution and file type (4k/1080p/720p/MP3).
 - **Concurrent downloads:** Choose up to 5 parallel downloads.
 - **Progress display:** Real-time download progress with color feedback.
 - **Supports playlists & subtitles** (where available).
@@ -56,11 +56,6 @@ YouTube, Vimeo, TikTok, Instagram, Twitter/X, Reddit, SoundCloud, Dailymotion, a
 
 - On first run, the app will attempt to auto-install `yt-dlp` and `ffmpeg` using `pip` or `winget`.
 - If auto-install fails, you may need to install these tools manually.
-- If shows '❌download error' than close the program. Double click on 'upgrade.bat'. Run program again.
-
-## License
-
-MIT License. See [LICENSE](./LICENSE) if included.
 
 ## Credits
 
