@@ -24,7 +24,7 @@ Supports YouTube, Vimeo, TikTok, Instagram, Twitter/X, Reddit, SoundCloud, Daily
 1. **Clone this repository or copy the files.**
 
    ```sh
-   https://github.com/shuvo62/Video_downloader_ytdlp.git
+   git clone https://github.com/shuvo62/Video_downloader_ytdlp.git
    ```
 
    or,
