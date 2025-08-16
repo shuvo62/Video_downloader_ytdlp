@@ -23,6 +23,14 @@ Supports YouTube, Vimeo, TikTok, Instagram, Twitter/X, Reddit, SoundCloud, Daily
 
 1. **Clone this repository or copy the files.**
 
+   ```sh
+   https://github.com/shuvo62/Video_downloader_ytdlp.git
+   ```
+
+   or,
+
+   Download the .zip file.
+
 2. **Install Python dependencies:**
 
    ```sh

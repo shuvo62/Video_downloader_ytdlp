@@ -534,7 +534,7 @@ class MainWindow(QWidget):
             while True:
                 msg_type, idx, url, msg = self.queue_out.get_nowait()
                 if idx is not None and idx < len(self.progress_labels):
-                    display = msg[:150] + ('...' if len(msg) > 150 else '')
+                    display = msg[:180] + ('...' if len(msg) > 180 else '')
                     self.progress_labels[idx].setText(display)
         except queue.Empty:
             pass
