@@ -1,7 +1,7 @@
 # Video Downloader with yt-dlp
 
 A modern, user-friendly GUI video downloader built with PyQt6.
-Supports YouTube, Vimeo, TikTok, Instagram, Twitter/X, Reddit, SoundCloud, Dailymotion, and more via [`yt-dlp`](https://github.com/yt-dlp/yt-dlp).
+Supports YouTube, Facebook, Vimeo, TikTok, Instagram, Twitter/X, Reddit, SoundCloud, Dailymotion, and more via [`yt-dlp`](https://github.com/yt-dlp/yt-dlp).
 
 ## Features
 
@@ -58,7 +58,7 @@ Supports YouTube, Vimeo, TikTok, Instagram, Twitter/X, Reddit, SoundCloud, Daily
 
 ## Supported Sites
 
-YouTube, Vimeo, TikTok, Instagram, Twitter/X, Reddit, SoundCloud, Dailymotion, and more!
+YouTube, Facebook, Vimeo, TikTok, Instagram, Twitter/X, Reddit, SoundCloud, Dailymotion, and more!
 
 ## Notes
 
