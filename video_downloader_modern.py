@@ -185,7 +185,6 @@ class MainWindow(QWidget):
         self.setStyleSheet(f"""
             QWidget {{
                 background-color: {LIGHT_GRAY};
-                color: black;
             }}
         """)
         self.download_folder = load_last_folder()
@@ -251,6 +250,7 @@ class MainWindow(QWidget):
 
         # TextEdit for URLs
         self.url_input = QTextEdit()
+        self.url_input.setStyleSheet(f"border: 2px solid {DARK_BLUE}; border-radius: 5px; padding: 5px;")
         self.url_input.setPlaceholderText("Paste URLs here, one per line...")
         self.url_input.setFont(QFont("Play", 12))
         self.url_input.setFixedHeight(200)
@@ -286,6 +286,7 @@ class MainWindow(QWidget):
         label_concurrent.setFixedHeight(50)
 
         self.combo = QComboBox()
+        self.combo.setStyleSheet(f"border: 2px solid {DARK_BLUE}; border-radius: 5px; padding: 5px;")
         self.combo.addItems([str(i) for i in range(1, 6)])
         self.combo.setCurrentIndex(2) # Default to 3 concurrent downloads.
         self.combo.setFixedWidth(50)
@@ -310,6 +311,7 @@ class MainWindow(QWidget):
         self.preview_scroll.setFixedHeight(160)  # adjust as needed
         self.preview_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.preview_widget = QWidget()
+        self.preview_widget.setStyleSheet(f"border: 1px solid {DARK_BLUE}; border-radius: 5px; background-color: {LIGHT_GRAY}; padding: 10px;")
         self.preview_layout = QVBoxLayout(self.preview_widget)
         self.preview_layout.setContentsMargins(0, 0, 0, 0)
         self.preview_scroll.setWidget(self.preview_widget)
@@ -324,6 +326,7 @@ class MainWindow(QWidget):
         self.progress_scroll.setFixedHeight(160)  # adjust as needed
         self.progress_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.progress_widget = QWidget()
+        self.progress_widget.setStyleSheet(f"border: 1px solid {DARK_BLUE}; border-radius: 5px; background-color: {LIGHT_GRAY}; padding: 10px;")
         self.progress_layout = QVBoxLayout(self.progress_widget)
         self.progress_layout.setContentsMargins(0, 20, 0, 20)
         self.progress_scroll.setWidget(self.progress_widget)
