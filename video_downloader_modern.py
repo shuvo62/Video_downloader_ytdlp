@@ -1,5 +1,16 @@
+"""
+Fixed Video Downloader GUI using yt-dlp and PyQt6
+- Safer MP4 format selection to avoid WebM/Opus remux failures
+- URL sanitization (removes noisy share params like `si`)
+- Writes per-download log files so you can inspect yt-dlp output
+- Uses full path to yt-dlp binary when available
+- Better ffmpeg dependency error handling (requests binary install)
+
+Save this file and run with Python (requires PyQt6 and yt-dlp installed).
+"""
+
 import threading, queue, sys, shutil, os, subprocess, json
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit, urlunsplit, parse_qsl, urlencode
 from collections import deque
 
 from PyQt6.QtWidgets import (
@@ -9,6 +20,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt, QTimer
 
+# ---------- UI constants ----------
 DARK_BLUE = "#004080"
 LIGHT_BLUE = "#0069D2"
 ORANGE = "#FF5F15"
@@ -89,23 +101,24 @@ button_style = f"""
     }}
 """
 
-def ensure_dependencies():
-    if not shutil.which("yt-dlp"):
-        try:
-            subprocess.run(["winget", "install", "-e", "--id", "yt-dlp.yt-dlp", "-h"], check=True)
-        except:
-            try:
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "yt-dlp"])
-            except:
-                show_dep_error("yt-dlp")
-    if not shutil.which("ffmpeg"):
-        try:
-            subprocess.run(["winget", "install", "-e", "--id", "Gyan.FFmpeg", "-h"], check=True)
-        except:
-            try:
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "ffmpeg"])
-            except:
-                show_dep_error("ffmpeg")
+# ---------- Utilities ----------
+
+def save_last_folder(folder_path):
+    try:
+        with open(CONFIG_FILE, "w") as f:
+            json.dump({"last_folder": folder_path}, f)
+    except Exception:
+        pass
+
+
+def load_last_folder():
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            data = json.load(f)
+            return data.get("last_folder", "")
+    except Exception:
+        return ""
+
 
 def show_dep_error(pkg):
     app = QApplication.instance()
@@ -114,9 +127,14 @@ def show_dep_error(pkg):
     msg = QMessageBox()
     msg.setIcon(QMessageBox.Icon.Critical)
     msg.setWindowTitle("❌ Dependency Error")
-    msg.setText(f"🚫 {pkg} could not be installed.\nPlease install it manually.")
+    # Be explicit what binary is required
+    if pkg == "ffmpeg":
+        msg.setText("🚫 ffmpeg binary not found. Please install ffmpeg (system binary).\nWindows: winget install Gyan.FFmpeg or download from gyan.dev\nLinux: apt/yum/pacman install ffmpeg")
+    else:
+        msg.setText(f"🚫 {pkg} could not be installed. Please install it manually.")
     msg.exec()
     sys.exit(1)
+
 
 def detect_platform(url):
     try:
@@ -129,6 +147,7 @@ def detect_platform(url):
     except Exception:
         return "Other"
 
+
 def format_duration(seconds):
     try:
         seconds = int(seconds)
@@ -137,21 +156,43 @@ def format_duration(seconds):
     except:
         return "--:--"
 
-def save_last_folder(folder_path):
-    try:
-        with open(CONFIG_FILE, "w") as f:
-            json.dump({"last_folder": folder_path}, f)
-    except Exception:
-        pass
 
-def load_last_folder():
+# sanitize share params (strip noisy tokens like si, feature)
+def sanitize_url(u: str) -> str:
     try:
-        with open(CONFIG_FILE, "r") as f:
-            data = json.load(f)
-            return data.get("last_folder", "")
+        s = urlsplit(u.strip())
+        qs = [(k, v) for k, v in parse_qsl(s.query, keep_blank_values=True) if k.lower() not in {"si", "feature"}]
+        return urlunsplit((s.scheme or 'https', s.netloc, s.path, urlencode(qs), s.fragment))
     except Exception:
-        return ""
+        return u
 
+
+# Choose an MP4-safe format selector (prefers mp4 + m4a, falls back safely)
+def format_for(fmt: str):
+    # audio
+    if "MP3" in fmt:
+        return ["-f", "bestaudio/best", "--extract-audio", "--audio-format", "mp3", "--audio-quality", "0"]
+
+    # target max resolution
+    if "2160" in fmt:
+        res = 2160
+    elif "1080" in fmt:
+        res = 1080
+    elif "720" in fmt:
+        res = 720
+    else:
+        res = 1080
+
+    # prefer mp4 container with m4a audio; fallback to best mp4; then best
+    selector = (f"bestvideo[ext=mp4][height<={res}]+bestaudio[ext=m4a]/"
+                f"best[ext=mp4][height<={res}]/best[height<={res}]/best")
+    return ["-f", selector, "--merge-output-format", "mp4", "--embed-subs"]
+
+
+# Find yt-dlp binary path (use full path if available)
+YTDLP_BIN = shutil.which("yt-dlp") or "yt-dlp"
+
+# ---------- Thread pool ----------
 class ThreadPool:
     def __init__(self, max_threads):
         self.max = max_threads
@@ -165,7 +206,7 @@ class ThreadPool:
     def try_start(self):
         while self.active < self.max and self.q:
             self.active += 1
-            threading.Thread(target=self.worker, args=(self.q.popleft(),)).start()
+            threading.Thread(target=self.worker, args=(self.q.popleft(),), daemon=True).start()
 
     def worker(self, job):
         try:
@@ -174,6 +215,8 @@ class ThreadPool:
             self.active -= 1
             self.try_start()
 
+
+# ---------- Main Window ----------
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
@@ -187,8 +230,6 @@ class MainWindow(QWidget):
                 background-color: {LIGHT_GRAY};
             }}
         """)
-        self.download_folder = load_last_folder()
-        self.metadata_cache = {}
         self.entry_widgets = []
         self.progress_labels = []
         self.completed = []
@@ -366,7 +407,8 @@ class MainWindow(QWidget):
             if widget: widget.deleteLater()
         self.entry_widgets.clear()
         self.metadata_cancel_flag = False
-        self.metadata_links = [l.strip() for l in self.url_input.toPlainText().strip().splitlines() if l.strip()]
+        raw_links = [l.strip() for l in self.url_input.toPlainText().strip().splitlines() if l.strip()]
+        self.metadata_links = [sanitize_url(l) for l in raw_links]
         self.metadata_links_count = len(self.metadata_links)
         self.metadata_custom = custom
         if not self.metadata_links:
@@ -410,8 +452,8 @@ class MainWindow(QWidget):
                 meta = self.metadata_cache[url]
             else:
                 res = subprocess.run(
-                    ["yt-dlp", "--dump-json", "--skip-download", url],
-                    capture_output=True, text=True, timeout=30, check=True)
+                    [YTDLP_BIN, "--dump-json", "--skip-download", url],
+                    capture_output=True, text=True, timeout=40, check=True)
                 meta = json.loads(res.stdout)
                 self.metadata_cache[url] = meta
         except Exception:
@@ -483,7 +525,7 @@ class MainWindow(QWidget):
         frame = QFrame()
         frame.setLayout(row)
         self.preview_layout.addWidget(frame)
-        self.entry_widgets.append((url, combo, lbl, title))  # <- now holds url, combo, lbl, title
+        self.entry_widgets.append((url, combo, lbl, title))  # url, combo, lbl, title
 
     def reset_ui(self):
         self.url_input.clear()
@@ -503,32 +545,48 @@ class MainWindow(QWidget):
     def download_worker(self, idx, url, fmt, title):
         try:
             platform = detect_platform(url)
-            is_playlist = "playlist" in url.lower()
+            # Detect playlist by metadata instead of "playlist" in url
+            meta = self.metadata_cache.get(url, {})
+            is_playlist = meta.get("_type") == "playlist"
             output = os.path.join(self.download_folder or ".", "%(playlist_title)s" if is_playlist else "", "%(title)s.%(ext)s")
             output = output.replace("\\", "/")
-            cmd = ["yt-dlp", "-o", output]
+
+            # logs
+            safe_name = title.replace("/", "_").replace("\\", "_")[:80]
+            log_dir = os.path.join(self.download_folder or ".", "yt-dlp-logs")
+            os.makedirs(log_dir, exist_ok=True)
+            log_path = os.path.join(log_dir, f"yt-dlp-{idx}-{safe_name}.log")
+
+            cmd = [YTDLP_BIN, "-o", output]
+
+            # Subs always requested for video formats
             if "MP3" in fmt:
-                cmd += ["-f", "bestaudio", "--extract-audio", "--audio-format", "mp3"]
+                cmd += ["-f"] + ["bestaudio/best", "--extract-audio", "--audio-format", "mp3", "--audio-quality", "0"]
             else:
+                # ask for subtitles (silent if not available)
                 cmd += ["--write-auto-subs", "--write-subs", "--sub-langs", "en", "--sub-format", "srt"]
-                if "2160p" in fmt:
-                    cmd += ["-f", "bv[height<=2160]+ba/b", "--merge-output-format", "mp4", "--embed-subs"]
-                elif "1080p" in fmt:
-                    cmd += ["-f", "bv[height<=1080]+ba/b", "--merge-output-format", "mp4", "--embed-subs"]
-                elif "720p" in fmt:
-                    cmd += ["-f", "bv[height<=720]+ba/b", "--merge-output-format", "mp4", "--embed-subs"]
-                else:
-                    cmd += ["-f", "bv[height<=1080]+ba/b", "--merge-output-format", "mp4", "--embed-subs"]
+                cmd += format_for(fmt)
+
+            # Add network retries to be robust
+            cmd += ["--retries", "3", "--fragment-retries", "3"]
 
             self.queue_out.put(("status", idx, url, f'<span style="color: {DARK_BLUE}; font-size: 16px; font-family: Play; font-weight: bold;">⬇️ Downloading from {platform}...</span>'))
-            proc = subprocess.Popen(cmd + [url], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-            for line in proc.stdout:
-                styled_line = f'<span style="color: {ORANGE}; font-size: 16px; font-family: Play; font-weight: bold;">⏳ {line.strip()}</span>'
-                self.queue_out.put(("progress", idx, url, styled_line))
-            if proc.wait() == 0:
+
+            # Launch and write combined output to log
+            with open(log_path, "w", encoding="utf-8", errors="ignore") as lf:
+                proc = subprocess.Popen(cmd + [url], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                for line in proc.stdout:
+                    lf.write(line)
+                    lf.flush()
+                    styled_line = f'<span style="color: {ORANGE}; font-size: 16px; font-family: Play; font-weight: bold;">⏳ {line.strip()}</span>'
+                    self.queue_out.put(("progress", idx, url, styled_line))
+                ret = proc.wait()
+
+            if ret == 0:
                 self.queue_out.put(("success", idx, url, f'<span style="color: green; font-size: 16px; font-family: Play; font-weight: bold;">✅ Done: {title}</span>'))
             else:
-                self.queue_out.put(("fail", idx, url, f'<span style="color: red; font-size: 16px; font-family: Play; font-weight: bold;">❌ Download error: {title}</span>'))
+                self.queue_out.put(("fail", idx, url, f'<span style="color: red; font-size: 16px; font-family: Play; font-weight: bold;">❌ Download error: {title}<br>See log: {log_path}</span>'))
+                print(f"Error downloading {url}: Process exited with code {ret}. See {log_path}")
         except Exception as e:
             self.queue_out.put(("fail", idx, url, f"❌ {str(e)}: {title}"))
 
@@ -545,7 +603,7 @@ class MainWindow(QWidget):
         all_done = all(
             ('Done:' in label.text() or 'Download error' in label.text() or '❌' in label.text())
             for label in self.progress_labels
-        )
+        ) if self.progress_labels else False
         if all_done and self.progress_labels:
             self.result_label.setText("✅ Download Finished")
             self.result_label.setStyleSheet("color: green; font-weight: bold;")
@@ -559,7 +617,8 @@ class MainWindow(QWidget):
                 self.show_warning("⚠️ Cancelled", "No folder selected.")
                 return
 
-        urls = [l.strip() for l in self.url_input.toPlainText().strip().splitlines() if l.strip()]
+        raw_urls = [l.strip() for l in self.url_input.toPlainText().strip().splitlines() if l.strip()]
+        urls = [sanitize_url(u) for u in raw_urls]
         if not urls:
             self.show_warning("⚠️ Empty", "Paste at least one URL.")
             return
@@ -583,8 +642,8 @@ class MainWindow(QWidget):
     def _fetch_metadata_bg(self, url):
         try:
             res = subprocess.run(
-                ["yt-dlp", "--dump-json", "--skip-download", url],
-                capture_output=True, text=True, timeout=30, check=True)
+                [YTDLP_BIN, "--dump-json", "--skip-download", url],
+                capture_output=True, text=True, timeout=40, check=True)
             meta = json.loads(res.stdout)
         except Exception:
             meta = {}
@@ -637,6 +696,21 @@ class MainWindow(QWidget):
 
     def show_warning(self, title, msg):
         QMessageBox.warning(self, title, msg)
+
+
+# ---------- Dependency check (run early) ----------
+def ensure_dependencies():
+    # check yt-dlp
+    if not shutil.which("yt-dlp"):
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "yt-dlp"])
+        except Exception:
+            show_dep_error("yt-dlp")
+
+    # check ffmpeg binary exists
+    if not shutil.which("ffmpeg"):
+        show_dep_error("ffmpeg")
+
 
 if __name__ == "__main__":
     ensure_dependencies()
